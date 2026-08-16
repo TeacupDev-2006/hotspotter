@@ -43,8 +43,11 @@ export async function fetchWithTimeout(url, opts = {}, timeoutMs = 15000) {
   const doFetch = async (dispatcher) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const init = { ...opts, signal: ctrl.signal };
+    // undici 8 在 Node 22 上对显式 dispatcher: undefined 会抛错，仅在配置代理时传入
+    if (dispatcher) init.dispatcher = dispatcher;
     try {
-      return await undiciFetch(url, { ...opts, signal: ctrl.signal, dispatcher });
+      return await undiciFetch(url, init);
     } finally {
       clearTimeout(t);
     }

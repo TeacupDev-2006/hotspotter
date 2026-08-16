@@ -1,5 +1,9 @@
 # HotSpotter 热点雷达站
 
+> 🎓 **大学生的个人 AI 项目** · 作者：[小小红茶杯](https://github.com/TeacupDev-2006)（产品设计与验收）× [ZCode / GLM](https://z.ai)（AI 结对编程实现）
+>
+> 💡 项目灵感与产品形态参考了 [鱼皮的「AI 热点监控平台」项目](https://www.codefather.cn/course/2026625439052627970)（编程导航 AI 编程实战课），代码实现为本项目独立完成。
+
 个人热点监控系统：多源采集 · AI 判真 · 实时推送。
 
 面向不想手动刷新闻的你——添加几个监控关键词，雷达站自动扫描 Google News、Bing News 与 X（Twitter），由 AI 过滤噪音、聚类事件、评估真伪与热度，新情报实时推送到网页与邮箱。

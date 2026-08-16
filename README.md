@@ -25,6 +25,8 @@ npm start          # http://localhost:3210
 
 首次启动会自动扫描一轮。开发模式：`npm run dev`（文件变动自动重启）。
 
+部署到云服务器（7×24 运行）见 [DEPLOY.md](DEPLOY.md)。
+
 ## 配置（.env）
 
 复制 `.env.example` 为 `.env` 并填写：

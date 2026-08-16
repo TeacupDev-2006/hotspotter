@@ -3,7 +3,7 @@ import { config } from '../config.js';
 import { collectors } from '../collectors/index.js';
 import {
   insertKeyword, deleteKeyword, listKeywords,
-  listEvents, listNotifications, markNotificationsRead, stats,
+  listEvents, deleteEvent, listNotifications, markNotificationsRead, stats,
 } from '../db.js';
 import { runScan, getScanState } from '../pipeline.js';
 import { sseHandler } from '../notifiers/inapp.js';
@@ -49,6 +49,11 @@ api.get('/events', (req, res) => {
   const limit = Math.min(200, Number(req.query.limit) || 60);
   const keyword = String(req.query.keyword || '').trim();
   res.json({ events: listEvents({ limit, keyword }) });
+});
+
+api.delete('/events/:id', (req, res) => {
+  deleteEvent(Number(req.params.id));
+  res.json({ ok: true, stats: stats() });
 });
 
 api.get('/notifications', (req, res) => {

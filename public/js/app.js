@@ -4,7 +4,9 @@ import { setSignals, pulse, setScanning } from './radar.js';
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const state = { keywords: [], stats: {}, config: {}, events: [], filter: 'all', notifPermitted: false };
+const state = { keywords: [], stats: {}, config: {}, events: [], filter: 'all', filterSrc: 'all', notifPermitted: false };
+
+const sourceName = { google_news: 'GNEWS', bing_news: 'BING', toutiao: 'TT头条', twitter: 'X' };
 
 const verdictMeta = {
   verified: { label: '已验证', en: 'VERIFIED', cls: 'verified' },
@@ -12,8 +14,18 @@ const verdictMeta = {
   suspicious: { label: '存疑', en: 'SUSPECT', cls: 'suspicious' },
 };
 
-const sourceName = { google_news: 'GNEWS', bing_news: 'BING', twitter: 'X' };
 const domainOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return '链接'; } };
+
+/** 按本地日期分组：今天 / 昨天 / M月D日 */
+function dayLabel(dt) {
+  const d = new Date(dt);
+  const now = new Date();
+  const dayOf = (x) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  if (dayOf(d) === dayOf(now)) return '今天';
+  const yest = new Date(now.getTime() - 86400e3);
+  if (dayOf(d) === dayOf(yest)) return '昨天';
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
 
 function timeAgo(iso) {
   if (!iso) return '';
@@ -58,53 +70,82 @@ function renderEvents({ prependIds = [] } = {}) {
   const list = $('#feedList');
   const counts = { all: state.events.length, verified: 0, unverified: 0, suspicious: 0 };
   for (const ev of state.events) counts[ev.verdict] = (counts[ev.verdict] || 0) + 1;
-  $$('.filter span').forEach((el) => (el.textContent = counts[el.dataset.c] ?? 0));
+  $$('.filter [data-c]').forEach((el) => (el.textContent = counts[el.dataset.c] ?? 0));
 
-  const shown = state.events.filter((ev) => state.filter === 'all' || ev.verdict === state.filter);
+  const shown = state.events.filter((ev) => {
+    if (state.filter !== 'all' && ev.verdict !== state.filter) return false;
+    if (state.filterSrc !== 'all' && !(ev.sources || []).includes(state.filterSrc)) return false;
+    return true;
+  });
   $('#feedEmpty').hidden = shown.length > 0;
   list.innerHTML = '';
 
+  // 按日期分组渲染
+  let currentDay = null;
+  let groupEl = null;
   for (const ev of shown) {
-    const v = verdictMeta[ev.verdict] || verdictMeta.unverified;
-    const card = document.createElement('article');
-    card.className = `card card--${v.cls}`;
-    if (prependIds.includes(ev.id)) card.classList.add('card--lock');
-
-    const confCells = scaleCells(ev.confidence, 10);
-    const heatCells = scaleCells(ev.heat, 5);
-
-    card.innerHTML = `
-      <div class="card__top">
-        <span class="card__id">#${String(ev.id).padStart(4, '0')}</span>
-        <span class="badge badge--${v.cls}">${v.en} ${v.label}</span>
-        <span class="card__time">${timeAgo(ev.last_seen)}</span>
-      </div>
-      <h2 class="card__title">${esc(ev.title)}</h2>
-      <p class="card__summary">${esc(ev.summary)}</p>
-      <div class="meters">
-        <div class="meter">
-          <span class="meter__label">置信 CONF</span>
-          <span class="scale">${confCells}</span>
-          <span class="meter__val">${ev.confidence}</span>
-        </div>
-        <div class="meter">
-          <span class="meter__label">热度 HEAT</span>
-          <span class="scale">${heatCells}</span>
-          <span class="meter__val">${ev.heat}</span>
-        </div>
-        <div class="meter">
-          <span class="meter__label">交叉源 SRC</span>
-          <span class="meter__val">${ev.source_urls.length}</span>
-        </div>
-      </div>
-      <div class="card__foot">
-        ${(ev.matched_keywords || []).slice(0, 4).map((k) => `<span class="card__kw">${esc(k)}</span>`).join('')}
-        <div class="card__srcs">
-          ${ev.source_urls.slice(0, 4).map((u) => `<a class="srcLink" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(domainOf(u))}</a>`).join('')}
-        </div>
-      </div>`;
-    list.appendChild(card);
+    const day = dayLabel(ev.last_seen);
+    if (day !== currentDay) {
+      currentDay = day;
+      const head = document.createElement('div');
+      head.className = 'feed__day';
+      head.innerHTML = `── ${esc(day)} <b>${shown.filter((e) => dayLabel(e.last_seen) === day).length}</b> 条情报`;
+      list.appendChild(head);
+      groupEl = document.createElement('div');
+      groupEl.className = 'feed__list';
+      list.appendChild(groupEl);
+    }
+    groupEl.appendChild(buildCard(ev, prependIds));
   }
+}
+
+function buildCard(ev, prependIds) {
+  const v = verdictMeta[ev.verdict] || verdictMeta.unverified;
+  const card = document.createElement('article');
+  card.className = `card card--${v.cls}`;
+  if (prependIds.includes(ev.id)) card.classList.add('card--lock');
+  card.dataset.id = ev.id;
+
+  const confCells = scaleCells(ev.confidence, 10);
+  const heatCells = scaleCells(ev.heat, 5);
+  const srcTags = (ev.sources || [])
+    .slice(0, 3)
+    .map((s) => `<span class="card__kw" style="color:var(--amber);border-color:rgba(232,184,75,.3)">${sourceName[s] || s}</span>`)
+    .join('');
+
+  card.innerHTML = `
+    <div class="card__top">
+      <span class="card__id">#${String(ev.id).padStart(4, '0')}</span>
+      <span class="badge badge--${v.cls}">${v.en} ${v.label}</span>
+      ${srcTags}
+      <span class="card__time">${timeAgo(ev.last_seen)}</span>
+      <button class="card__del" aria-label="删除这条情报" title="删除">×</button>
+    </div>
+    <h2 class="card__title">${esc(ev.title)}</h2>
+    <p class="card__summary">${esc(ev.summary)}</p>
+    <div class="meters">
+      <div class="meter">
+        <span class="meter__label">置信 CONF</span>
+        <span class="scale">${confCells}</span>
+        <span class="meter__val">${ev.confidence}</span>
+      </div>
+      <div class="meter">
+        <span class="meter__label">热度 HEAT</span>
+        <span class="scale">${heatCells}</span>
+        <span class="meter__val">${ev.heat}</span>
+      </div>
+      <div class="meter">
+        <span class="meter__label">交叉源 SRC</span>
+        <span class="meter__val">${ev.source_urls.length}</span>
+      </div>
+    </div>
+    <div class="card__foot">
+      ${(ev.matched_keywords || []).slice(0, 4).map((k) => `<span class="card__kw">${esc(k)}</span>`).join('')}
+      <div class="card__srcs">
+        ${ev.source_urls.slice(0, 4).map((u) => `<a class="srcLink" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(domainOf(u))}</a>`).join('')}
+      </div>
+    </div>`;
+  return card;
 }
 
 function scaleCells(val, total) {
@@ -329,13 +370,43 @@ radar.addEventListener('keydown', (e) => {
 $('#filterBar').addEventListener('click', (e) => {
   const btn = e.target.closest('.filter');
   if (!btn) return;
-  state.filter = btn.dataset.f;
-  $$('.filter').forEach((b) => {
-    const on = b === btn;
-    b.classList.toggle('filter--on', on);
-    b.setAttribute('aria-selected', on);
-  });
+  if (btn.dataset.src) {
+    // 来源过滤（琥珀色组）
+    state.filterSrc = btn.dataset.src;
+    $$('.filter--src').forEach((b) => {
+      const on = b === btn;
+      b.classList.toggle('filter--on', on);
+      b.setAttribute('aria-pressed', on);
+    });
+  } else {
+    // 真伪过滤（磷光组）
+    state.filter = btn.dataset.f;
+    $$('.filter:not(.filter--src)').forEach((b) => {
+      const on = b === btn;
+      b.classList.toggle('filter--on', on);
+      b.setAttribute('aria-selected', on);
+    });
+  }
   renderEvents();
+});
+
+/* 删除情报（卡片 × 按钮，事件委托） */
+$('#feedList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.card__del');
+  if (!btn) return;
+  const card = btn.closest('.card');
+  const id = Number(card.dataset.id);
+  if (!id) return;
+  const r = await fetch(`/api/events/${id}`, { method: 'DELETE' }).then((r) => r.json());
+  if (r.ok) {
+    state.events = state.events.filter((ev) => ev.id !== id);
+    if (r.stats) state.stats = r.stats;
+    renderEvents();
+    renderStats();
+    toast(`◉ 情报 #${String(id).padStart(4, '0')} 已删除`);
+  } else {
+    toast('⚠ 删除失败，请重试');
+  }
 });
 
 /* 通知抽屉 */

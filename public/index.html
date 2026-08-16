@@ -75,6 +75,12 @@
       <button class="filter" data-f="verified" role="tab" aria-selected="false">已验证 <span data-c="verified">0</span></button>
       <button class="filter" data-f="unverified" role="tab" aria-selected="false">待印证 <span data-c="unverified">0</span></button>
       <button class="filter" data-f="suspicious" role="tab" aria-selected="false">存疑 <span data-c="suspicious">0</span></button>
+      <span class="filter__gap" aria-hidden="true"></span>
+      <button class="filter filter--src filter--on" data-src="all" aria-pressed="true">全部来源</button>
+      <button class="filter filter--src" data-src="toutiao" aria-pressed="false">TT 头条</button>
+      <button class="filter filter--src" data-src="google_news" aria-pressed="false">GNEWS</button>
+      <button class="filter filter--src" data-src="bing_news" aria-pressed="false">BING</button>
+      <button class="filter filter--src" data-src="twitter" aria-pressed="false">X</button>
     </nav>
     <div class="feed__list" id="feedList" aria-live="polite"></div>
     <div class="feed__empty" id="feedEmpty" hidden>

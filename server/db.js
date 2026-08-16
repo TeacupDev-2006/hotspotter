@@ -148,7 +148,16 @@ export function upsertEvent(ev) {
   return { id: Number(r.lastInsertRowid), isNew: true };
 }
 
+export function deleteEvent(id) {
+  db.prepare('DELETE FROM events WHERE id = ?').run(id);
+  db.prepare('DELETE FROM notifications WHERE event_id = ?').run(id);
+}
+
 export function listEvents({ limit = 50, keyword = '' } = {}) {
+  // raw_items 主键 → 来源 映射（数据量小，全量读一次）
+  const srcById = new Map(
+    db.prepare('SELECT id, source FROM raw_items').all().map((r) => [r.id, r.source])
+  );
   let rows = db
     .prepare('SELECT * FROM events ORDER BY last_seen DESC LIMIT ?')
     .all(limit);
@@ -161,11 +170,15 @@ export function listEvents({ limit = 50, keyword = '' } = {}) {
         r.matched_keywords.toLowerCase().includes(kw)
     );
   }
-  return rows.map((r) => ({
-    ...r,
-    source_urls: JSON.parse(r.source_urls),
-    matched_keywords: JSON.parse(r.matched_keywords),
-  }));
+  return rows.map((r) => {
+    const itemIds = JSON.parse(r.raw_item_ids);
+    return {
+      ...r,
+      source_urls: JSON.parse(r.source_urls),
+      matched_keywords: JSON.parse(r.matched_keywords),
+      sources: [...new Set(itemIds.map((id) => srcById.get(id)).filter(Boolean))],
+    };
+  });
 }
 
 export function addNotification(n) {

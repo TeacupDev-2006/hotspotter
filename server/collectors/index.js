@@ -1,9 +1,10 @@
 import * as googleNews from './googleNews.js';
 import * as bingNews from './bingNews.js';
 import * as twitter from './twitter.js';
+import * as toutiao from './toutiao.js';
 import { politeDelay } from '../lib.js';
 
-export const collectors = { google_news: googleNews, bing_news: bingNews, twitter };
+export const collectors = { google_news: googleNews, bing_news: bingNews, toutiao, twitter };
 
 /**
  * 多源聚合采集：单源失败自动降级，不影响其他源。

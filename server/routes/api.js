@@ -64,3 +64,35 @@ api.post('/notifications/read', (req, res) => {
 });
 
 api.get('/stream', sseHandler);
+
+// 只读诊断：Node 版本、代理配置、各信息源连通性（不含任何密钥）
+api.get('/diag', async (req, res) => {
+  const { fetchWithTimeout } = await import('../lib.js');
+  const targets = {
+    bing: 'https://www.bing.com/news/search?q=test&format=RSS',
+    google_news: 'https://news.google.com/rss/search?q=test&hl=zh-CN',
+    openrouter: 'https://openrouter.ai/api/v1/models?limit=1',
+    twitterapi: 'https://api.twitterapi.io/',
+  };
+  const tests = {};
+  for (const [name, url] of Object.entries(targets)) {
+    try {
+      const r = await fetchWithTimeout(url, { method: 'GET' }, 8000);
+      tests[name] = { ok: r.status };
+    } catch (e) {
+      tests[name] = {
+        ok: false,
+        error: String(e?.cause?.message || e?.message || e).slice(0, 150),
+        causeCode: e?.cause?.code || null,
+      };
+    }
+  }
+  res.json({
+    node: process.version,
+    proxyConfigured: !!config.proxyUrl,
+    proxyAddr: config.proxyUrl ? config.proxyUrl.replace(/\/\/.*@/, '//***@') : null,
+    model: config.openrouter.model,
+    smtpConfigured: smtpConfigured(),
+    tests,
+  });
+});

@@ -1,0 +1,437 @@
+/* ═══════════════════════════════════════════════════
+   HotSpotter 热点雷达站
+   视觉根基：业余无线电监测站的磷光雷达屏
+   —— 墨绿磷光体、琥珀指示灯、等宽仪表数字
+   ═══════════════════════════════════════════════════ */
+
+:root {
+  --bg: #0a1612;
+  --panel: #0e1f18;
+  --panel-2: #122820;
+  --line: #1e3a2e;
+  --line-bright: #2c5241;
+  --phos: #64e8a0;
+  --phos-soft: rgba(100, 232, 160, 0.14);
+  --phos-dim: rgba(100, 232, 160, 0.4);
+  --amber: #e8b84b;
+  --amber-soft: rgba(232, 184, 75, 0.12);
+  --red: #e86a5d;
+  --red-soft: rgba(232, 106, 93, 0.12);
+  --text: #c9e5d3;
+  --text-dim: #6e8f7e;
+  --text-faint: #4a6759;
+  --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --sans: -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --radius: 6px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { color-scheme: dark; }
+
+body {
+  font-family: var(--sans);
+  background:
+    radial-gradient(1100px 500px at 18% -8%, rgba(100, 232, 160, 0.05), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+/* 极淡的 CRT 扫描纹，只作质感不作装饰 */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 999;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0, 0, 0, 0.09) 2px 4px);
+  mix-blend-mode: multiply;
+}
+
+.mono { font-family: var(--mono); }
+
+a { color: var(--phos); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+/* ═══════ 顶栏 ═══════ */
+
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 20px;
+  padding: 10px 20px;
+  background: rgba(10, 22, 18, 0.92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar__brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+.topbar__lamp {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--phos);
+  box-shadow: 0 0 8px var(--phos-dim), 0 0 2px var(--phos);
+  flex: none;
+}
+.topbar__lamp--amber { background: var(--amber); box-shadow: 0 0 8px rgba(232,184,75,.5); }
+
+.topbar__name {
+  font-weight: 800; letter-spacing: 0.22em; font-size: 15px; color: #eafaf0;
+  white-space: nowrap;
+}
+.topbar__sub {
+  margin-left: 10px; font-weight: 400; letter-spacing: 0.3em;
+  font-size: 11px; color: var(--text-dim);
+  display: inline-block; transform: translateY(-1px);
+}
+
+.topbar__status {
+  margin-left: auto;
+  font-size: 12px; letter-spacing: 0.14em; color: var(--phos);
+  display: flex; align-items: center; gap: 8px;
+  white-space: nowrap;
+}
+.topbar__status--scanning { color: var(--amber); }
+
+.blink { animation: blink 1.6s steps(2, start) infinite; }
+@keyframes blink { 50% { opacity: 0.25; } }
+
+.topbar__right { display: flex; align-items: center; gap: 14px; }
+
+.topbar__clock { font-size: 12px; color: var(--text-dim); letter-spacing: 0.08em; }
+
+.topbar__bell {
+  position: relative;
+  background: none; border: 1px solid var(--line); border-radius: var(--radius);
+  color: var(--text-dim); width: 34px; height: 34px;
+  display: grid; place-items: center; cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.topbar__bell:hover { color: var(--phos); border-color: var(--line-bright); }
+
+.topbar__badge {
+  position: absolute; top: -7px; right: -7px;
+  background: var(--red); color: #fff;
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  min-width: 17px; height: 17px; border-radius: 9px;
+  display: grid; place-items: center; padding: 0 4px;
+  box-shadow: 0 0 8px rgba(232, 106, 93, 0.6);
+}
+
+/* 扫描进行时顶栏下沿的流动光带 */
+.scanline {
+  position: sticky; top: 55px; z-index: 49; height: 2px; overflow: hidden;
+  background: var(--amber-soft);
+}
+.scanline::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  width: 40%; animation: sweep 1.8s linear infinite;
+}
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
+
+/* ═══════ 主体 ═══════ */
+
+.deck {
+  display: grid; grid-template-columns: 340px 1fr;
+  gap: 18px; padding: 18px 20px 40px;
+  max-width: 1440px; margin: 0 auto;
+  align-items: start;
+}
+
+/* —— 左：设备架 —— */
+
+.rack { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 72px; }
+
+.panel {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.panel__head {
+  font-size: 10px; letter-spacing: 0.22em; color: var(--text-faint);
+  padding-bottom: 10px; margin-bottom: 12px;
+  border-bottom: 1px dashed var(--line);
+  display: flex; justify-content: space-between;
+}
+
+.radar__caption {
+  text-align: center; font-size: 11px; color: var(--text-dim);
+  letter-spacing: 0.1em; margin-top: 6px;
+}
+
+#radar {
+  display: block; width: 100%; height: auto;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: filter 0.2s ease;
+}
+#radar:hover, #radar:focus-visible {
+  filter: brightness(1.18) drop-shadow(0 0 14px rgba(100, 232, 160, 0.3));
+  outline: none;
+}
+body.is-scanning #radar { cursor: default; filter: none; }
+
+/* 信号 chips */
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--line-bright);
+  background: var(--phos-soft);
+  color: var(--phos);
+  font-family: var(--mono); font-size: 12px;
+  padding: 4px 6px 4px 10px; border-radius: 4px;
+}
+.chip::before { content: '◎'; font-size: 10px; opacity: 0.7; }
+.chip button {
+  background: none; border: none; color: inherit; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 1px 4px; border-radius: 3px;
+  opacity: 0.55; font-family: var(--mono);
+}
+.chip button:hover { opacity: 1; background: rgba(232, 106, 93, 0.2); }
+
+.chips--topic .chip { background: var(--amber-soft); color: var(--amber); border-color: rgba(232, 184, 75, 0.3); }
+
+.chips__label { font-size: 11px; color: var(--text-faint); font-family: var(--mono); width: 100%; margin-top: 4px; }
+
+.addSignal { display: flex; gap: 8px; margin-top: 12px; }
+
+.addSignal__input {
+  flex: 1; min-width: 0;
+  background: var(--bg); border: 1px solid var(--line);
+  color: var(--text); font-size: 12px;
+  padding: 7px 10px; border-radius: 4px;
+  transition: border-color 0.15s;
+}
+.addSignal__input:focus { outline: none; border-color: var(--phos-dim); }
+.addSignal__input::placeholder { color: var(--text-faint); }
+
+.btn {
+  border: 1px solid var(--line-bright); background: none;
+  color: var(--text); border-radius: 4px;
+  cursor: pointer; font-size: 12px; padding: 7px 14px;
+  transition: all 0.15s; letter-spacing: 0.06em;
+}
+.btn:hover { border-color: var(--phos-dim); color: var(--phos); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn--ghost { border-color: var(--line); color: var(--text-dim); padding: 5px 10px; }
+.btn--sm { font-size: 11px; padding: 4px 8px; }
+
+.btn--scan {
+  width: 100%; margin-top: 12px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--phos-soft); border-color: var(--phos-dim); color: var(--phos);
+  font-weight: 600; padding: 10px; font-size: 13px;
+}
+.btn--scan:hover { background: rgba(100, 232, 160, 0.22); box-shadow: 0 0 18px rgba(100, 232, 160, 0.15); }
+
+.btn__lamp { width: 7px; height: 7px; border-radius: 50%; background: var(--phos); box-shadow: 0 0 6px var(--phos-dim); }
+.btn--scan:disabled .btn__lamp { background: var(--amber); box-shadow: 0 0 6px rgba(232,184,75,.5); animation: blink 1s steps(2, start) infinite; }
+
+/* 接收机状态 */
+
+.receivers { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+.receiver { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.receiver__name { font-family: var(--mono); color: var(--text-dim); width: 92px; letter-spacing: 0.05em; }
+.receiver__bars { display: flex; gap: 3px; }
+.receiver__bar { width: 6px; height: 12px; background: var(--line); border-radius: 1px; }
+.receiver__bar--on { background: var(--phos); box-shadow: 0 0 4px var(--phos-dim); }
+.receiver--down .receiver__bar--on { background: var(--red); box-shadow: 0 0 4px rgba(232,106,93,.5); }
+.receiver__note { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+
+.lastscan { font-size: 10px; color: var(--text-faint); margin-top: 12px; letter-spacing: 0.04em; line-height: 1.7; }
+
+/* —— 右：情报流 —— */
+
+.feed__head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+
+.feed__title { font-size: 26px; font-weight: 800; letter-spacing: 0.06em; color: #eafaf0; }
+.feed__titleEn { font-size: 11px; color: var(--text-faint); letter-spacing: 0.3em; margin-left: 12px; font-weight: 400; }
+
+.feed__stats { margin-left: auto; font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em; }
+
+.feed__filter { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+
+.filter {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  color: var(--text-dim); font-size: 12px; padding: 5px 12px;
+  cursor: pointer; letter-spacing: 0.04em;
+}
+.filter span { opacity: 0.65; margin-left: 3px; }
+.filter:hover { color: var(--text); }
+.filter--on {
+  color: var(--phos); border-color: var(--line-bright); background: var(--phos-soft);
+}
+
+.feed__list { display: flex; flex-direction: column; gap: 12px; }
+
+/* 情报卡片：左缘 verdict 色条 + 仪器化数据 */
+
+.card {
+  position: relative;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px 14px 20px;
+  overflow: hidden;
+  animation: cardIn 0.35s ease;
+}
+.card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--v, var(--text-dim));
+  box-shadow: 0 0 10px var(--v, transparent);
+}
+.card--verified { --v: var(--phos); }
+.card--unverified { --v: var(--amber); }
+.card--suspicious { --v: var(--red); }
+
+@keyframes cardIn { from { opacity: 0; transform: translateY(8px); } }
+
+/* 新捕获：角标收拢锁定动画 */
+.card--lock::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border: 1px solid var(--phos);
+  clip-path: polygon(0 0, 22px 0, 22px 2px, 2px 2px, 2px 22px, 0 22px);
+  animation: lockin 1.4s ease-out forwards;
+}
+@keyframes lockin {
+  from { inset: -30px; opacity: 1; }
+  to { inset: 0; opacity: 0; }
+}
+
+.card__top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+
+.card__id { font-family: var(--mono); font-size: 11px; color: var(--text-faint); letter-spacing: 0.06em; }
+
+.badge {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.12em; padding: 2px 8px; border-radius: 3px;
+  border: 1px solid;
+}
+.badge--verified { color: var(--phos); border-color: var(--phos-dim); background: var(--phos-soft); }
+.badge--unverified { color: var(--amber); border-color: rgba(232,184,75,.4); background: var(--amber-soft); }
+.badge--suspicious { color: var(--red); border-color: rgba(232,106,93,.4); background: var(--red-soft); }
+
+.card__time { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+
+.card__title { font-size: 16.5px; font-weight: 700; color: #eafaf0; line-height: 1.5; margin-bottom: 6px; }
+
+.card__summary { color: var(--text-dim); font-size: 13.5px; line-height: 1.75; margin-bottom: 12px; }
+
+/* 仪表面板行：置信度刻度 + 热度 S-meter */
+
+.meters { display: flex; gap: 22px; flex-wrap: wrap; padding: 10px 12px; background: rgba(0, 0, 0, 0.25); border-radius: 4px; border: 1px solid var(--line); }
+
+.meter { display: flex; align-items: center; gap: 8px; }
+.meter__label { font-family: var(--mono); font-size: 10px; color: var(--text-faint); letter-spacing: 0.1em; }
+
+.scale { display: flex; gap: 2px; align-items: flex-end; }
+.scale i {
+  width: 5px; border-radius: 1px 1px 0 0; display: block;
+  height: calc(6px + var(--i) * 2px);
+  background: var(--line);
+}
+.scale i.on { background: var(--phos); box-shadow: 0 0 5px var(--phos-dim); }
+.card--suspicious .scale i.on { background: var(--red); box-shadow: 0 0 5px rgba(232,106,93,.4); }
+
+.meter__val { font-family: var(--mono); font-size: 12px; color: var(--text); font-weight: 600; }
+
+.card__foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.card__kw {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  border: 1px dashed var(--line); padding: 2px 7px; border-radius: 3px;
+}
+
+.card__srcs { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+.srcLink {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em;
+  color: var(--text-dim); border: 1px solid var(--line);
+  padding: 2px 8px; border-radius: 3px;
+  transition: all 0.15s;
+}
+.srcLink:hover { color: var(--phos); border-color: var(--phos-dim); text-decoration: none; }
+
+.srcLink--x { color: inherit; }
+
+.feed__empty {
+  text-align: center; padding: 70px 20px; color: var(--text-faint);
+  border: 1px dashed var(--line); border-radius: var(--radius);
+}
+.feed__empty p:first-child { letter-spacing: 0.3em; font-size: 12px; margin-bottom: 14px; color: var(--text-dim); }
+
+/* ═══════ 通知抽屉 ═══════ */
+
+.drawerMask { position: fixed; inset: 0; background: rgba(4, 10, 8, 0.6); z-index: 90; }
+
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 92vw);
+  background: var(--panel); border-left: 1px solid var(--line-bright);
+  z-index: 100; display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.25s ease;
+}
+.drawer--open { transform: translateX(0); }
+
+.drawer__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+  font-size: 11px; color: var(--text-dim); letter-spacing: 0.15em;
+}
+
+.drawer__list { overflow-y: auto; flex: 1; padding: 12px; }
+
+.notif {
+  padding: 12px; border: 1px solid var(--line); border-radius: 4px;
+  margin-bottom: 8px; background: var(--panel-2);
+}
+.notif--unread { border-left: 3px solid var(--phos); }
+.notif__title { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.5; }
+.notif__body { font-size: 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.6; }
+.notif__time { font-family: var(--mono); font-size: 10px; color: var(--text-faint); margin-top: 6px; }
+
+.drawer__empty { text-align: center; color: var(--text-faint); padding: 40px 10px; font-size: 13px; }
+
+/* ═══════ Toast ═══════ */
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--panel-2); border: 1px solid var(--phos-dim);
+  color: var(--phos); font-size: 12px; letter-spacing: 0.05em;
+  padding: 10px 20px; border-radius: 4px; z-index: 120;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ═══════ 响应式 ═══════ */
+
+@media (max-width: 1024px) {
+  .deck { grid-template-columns: 1fr; }
+  .rack { position: static; display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; }
+  .rack__radar { grid-column: 1 / -1; }
+  .rack__radar #radar { max-height: 260px; margin: 0 auto; }
+}
+
+@media (max-width: 640px) {
+  .topbar { gap: 10px; padding: 8px 12px; }
+  .topbar__clock { display: none; }
+  .topbar__status { font-size: 10px; }
+  .deck { padding: 12px; gap: 12px; }
+  .rack { grid-template-columns: 1fr; }
+  .feed__title { font-size: 21px; }
+  .card { padding: 12px 12px 12px 16px; }
+  .meters { gap: 14px; }
+}
+
+/* ═══════ 动效尊重 ═══════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
+  .blink { animation: none; }
+}

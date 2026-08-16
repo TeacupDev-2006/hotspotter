@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HotSpotter 热点雷达站</title>
+<meta name="description" content="个人热点监控情报站：多源采集 · AI 判真 · 实时推送">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ═══════ 顶栏 ═══════ -->
+<header class="topbar">
+  <div class="topbar__brand">
+    <span class="topbar__lamp" id="sysLamp" aria-hidden="true"></span>
+    <span class="topbar__name">HOTSPOTTER<span class="topbar__sub">热点雷达站</span></span>
+  </div>
+  <div class="topbar__status mono" id="sysStatus" role="status" aria-live="polite">
+    <span class="blink" data-on>●</span> STANDBY
+  </div>
+  <div class="topbar__right">
+    <time class="topbar__clock mono" id="clock" aria-label="当前时间">--:--:--</time>
+    <button class="topbar__bell" id="bellBtn" aria-label="打开通知中心">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="topbar__badge" id="bellBadge" hidden>0</span>
+    </button>
+  </div>
+</header>
+<div class="scanline" id="scanline" aria-hidden="true" hidden></div>
+
+<!-- ═══════ 主体：左设备架 + 右情报流 ═══════ -->
+<main class="deck">
+
+  <!-- 左：设备架 -->
+  <aside class="rack">
+    <section class="panel rack__radar" aria-label="值班雷达">
+      <div class="panel__head mono">DUTY RADAR · 值班雷达</div>
+      <canvas id="radar" width="360" height="360" role="button" tabindex="0"
+              aria-label="值班雷达：点击立即扫描"
+              title="点击雷达，立即扫描"></canvas>
+      <div class="radar__caption mono" id="radarCaption">0 信号在监听</div>
+    </section>
+
+    <section class="panel rack__signals" aria-label="信号管理">
+      <div class="panel__head mono">SIGNALS · 监控信号</div>
+      <div class="chips" id="signalChips"></div>
+      <form class="addSignal" id="addSignalForm">
+        <input class="addSignal__input mono" id="addSignalInput" type="text" maxlength="60"
+               placeholder="输入关键词，回车添加" autocomplete="off" aria-label="新监控关键词">
+        <button class="btn btn--ghost mono" type="submit">+ 添加</button>
+      </form>
+    </section>
+
+    <section class="panel rack__sources" aria-label="信息源状态">
+      <div class="panel__head mono">RECEIVERS · 接收机</div>
+      <ul class="receivers" id="receivers"></ul>
+      <div class="lastscan mono" id="lastScan">尚未扫描</div>
+      <button class="btn btn--scan mono" id="scanBtn">
+        <span class="btn__lamp" aria-hidden="true"></span> 立即扫描
+      </button>
+    </section>
+  </aside>
+
+  <!-- 右：情报流 -->
+  <section class="feed" aria-label="情报流">
+    <div class="feed__head">
+      <h1 class="feed__title">情报流<span class="feed__titleEn mono">INTEL FEED</span></h1>
+      <div class="feed__stats mono" id="feedStats"></div>
+    </div>
+    <nav class="feed__filter mono" id="filterBar" role="tablist" aria-label="过滤情报">
+      <button class="filter filter--on" data-f="all" role="tab" aria-selected="true">全部 <span data-c="all">0</span></button>
+      <button class="filter" data-f="verified" role="tab" aria-selected="false">已验证 <span data-c="verified">0</span></button>
+      <button class="filter" data-f="unverified" role="tab" aria-selected="false">待印证 <span data-c="unverified">0</span></button>
+      <button class="filter" data-f="suspicious" role="tab" aria-selected="false">存疑 <span data-c="suspicious">0</span></button>
+    </nav>
+    <div class="feed__list" id="feedList" aria-live="polite"></div>
+    <div class="feed__empty" id="feedEmpty" hidden>
+      <p class="mono">NO SIGNAL CAPTURED</p>
+      <p>雷达正在监听你添加的关键词。<br>添加信号或点击「立即扫描」，捕获的情报会出现在这里。</p>
+    </div>
+  </section>
+</main>
+
+<!-- ═══════ 通知抽屉 ═══════ -->
+<div class="drawerMask" id="drawerMask" hidden></div>
+<aside class="drawer" id="drawer" aria-label="通知中心" aria-hidden="true">
+  <div class="drawer__head">
+    <span class="mono">NOTIFICATIONS · 通知中心</span>
+    <div>
+      <button class="btn btn--ghost btn--sm mono" id="readAllBtn">全部已读</button>
+      <button class="btn btn--ghost btn--sm mono" id="closeDrawerBtn" aria-label="关闭">×</button>
+    </div>
+  </div>
+  <div class="drawer__list" id="notifList"></div>
+</aside>
+
+<div class="toast mono" id="toast" role="status" hidden></div>
+
+<script type="module" src="js/radar.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

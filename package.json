@@ -1,0 +1,25 @@
+{
+  "name": "hotspotter",
+  "version": "1.0.0",
+  "description": "HotSpotter 热点雷达站 — 个人热点监控系统（多源采集 + AI 判断 + 多渠道通知）",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "scan": "node server/tests/run-scan.js",
+    "test:collectors": "node server/tests/collectors.test.js",
+    "test:ai": "node server/tests/ai.test.js",
+    "skill": "node skill/hotspotter/scripts/hotspot.js"
+  },
+  "engines": {
+    "node": ">=20.5.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.15",
+    "undici": "^8.10.0"
+  }
+}

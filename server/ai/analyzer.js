@@ -54,7 +54,8 @@ function engagementScore(items) {
   return Math.min(100, Math.round(best));
 }
 
-const BATCH_SIZE = 14;
+// 每批分析的条目数：批次越大请求数越少（OpenRouter 免费档有每日请求上限）
+const BATCH_SIZE = 28;
 
 /**
  * 批量分析 raw_items → 事件数组（内部自动分批，防止输出截断）。
@@ -67,10 +68,13 @@ export async function analyzeItems(items) {
   const allDiscarded = [];
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const batch = items.slice(i, i + BATCH_SIZE);
-    const out = await chatJson([
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildUserPrompt(batch) },
-    ]);
+    const out = await chatJson(
+      [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: buildUserPrompt(batch) },
+      ],
+      { maxTokens: 12000 }
+    );
     const { events, discardedIds } = normalize(out, batch);
     allEvents.push(...events);
     allDiscarded.push(...discardedIds);

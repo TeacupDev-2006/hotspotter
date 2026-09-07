@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "scan": "node server/tests/run-scan.js",
     "test:collectors": "node server/tests/collectors.test.js",
     "test:ai": "node server/tests/ai.test.js",
     "skill": "node skill/hotspotter/scripts/hotspot.js"

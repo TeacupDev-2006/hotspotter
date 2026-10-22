@@ -19,6 +19,6 @@
     "express": "^4.21.2",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.15",
-    "undici": "^8.10.0"
+    "undici": "^8.12.3"
   }
 }
